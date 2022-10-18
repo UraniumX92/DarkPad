@@ -1,6 +1,5 @@
 import random
 import json
-from re import I
 
 bullet_char = "\u2022"
 

@@ -8,9 +8,9 @@
 from darkpad import DarkPad
 
 path = str(__file__)
-pl = path.split('\\')
-pl[-1] = 'img\\Darkpad.ico'
-icon = "\\".join(pl)
+plist = path.split('\\')
+plist[-1] = 'img/DarkPad.ico'
+icon_path = "\\".join(plist)
 
-darkpad = DarkPad(geometry="1200x700",icon=icon)
+darkpad = DarkPad(geometry="1200x700",icon=icon_path)
 darkpad.mainloop()

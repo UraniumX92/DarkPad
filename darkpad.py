@@ -29,7 +29,8 @@ class DarkPad(Tk):
         # Initialization
         self.__app_name = "DarkPad"
         self.title(f"Untitled - {self.app_name}")
-        self.iconbitmap(icon)
+        self.icon_path = icon
+        self.iconbitmap(self.icon_path)
         self._curr_file = None
         self.font_tuple = ['Consolas',12]
         self.geometry(geometry)
@@ -241,6 +242,7 @@ class DarkPad(Tk):
             # search window initialization and configuration
             self.search_window = Toplevel(master=self,background=BACKGROUND)
             self.search_window.geometry("350x150")
+            self.search_window.iconbitmap(self.icon_path)
             self.search_window.title(f"Find & Replace - {self.app_name}")
             self.search_window.resizable(width=False,height=False)
             self.search_window.protocol("WM_DELETE_WINDOW",func=fr_destroy)
