@@ -1,5 +1,6 @@
 import random
 import json
+from re import I
 
 bullet_char = "\u2022"
 
@@ -105,3 +106,12 @@ def to_even(n):
         return n
     else:
         return n-1
+
+def find_in(lst:list,val):
+    """
+    Finds the given value in list and returns the index of first occurrence of value
+    """
+    for i,item in enumerate(lst):
+        if item == val:
+            return i
+    return -1

@@ -7,5 +7,10 @@
 """
 from darkpad import DarkPad
 
-darkpad = DarkPad("1200x700")
+path = str(__file__)
+pl = path.split('\\')
+pl[-1] = 'img\\Darkpad.ico'
+icon = "\\".join(pl)
+
+darkpad = DarkPad(geometry="1200x700",icon=icon)
 darkpad.mainloop()

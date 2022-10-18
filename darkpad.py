@@ -1,41 +1,48 @@
 import os
+import re
 import sys
+import json
 import utils
 import binary_utils
 from tkinter import *
-from tkinter.simpledialog import askinteger,askstring
-from tkinter import messagebox as msgbox
+from datetime import datetime
 from tkinter import filedialog as fd
+from tkinter import messagebox as msgbox
+from tkinter.simpledialog import askinteger,askstring
 
 # Constants
 BACKGROUND = '#191919'
 SECONDARY_BG = '#2d2d2d'
 white = 'white'
+highlight_clr = '#e9ff40'
 min_fsize = 2
 max_fsize = 100
-fonts = ["Arial","Courier","Consolas","Times"]
+fonts = ["Arial","Courier","Consolas","Times","Segoe UI"]
+fonts.sort()
 
 class DarkPad(Tk):
     """
     The entire application of DarkPad, from its GUI to commands,events,methods all packed in single class
     """
-    def __init__(self,geometry) -> None:
+    def __init__(self,geometry,icon) -> None:
         Tk.__init__(self)
         # Initialization
         self.__app_name = "DarkPad"
         self.title(f"Untitled - {self.app_name}")
+        self.iconbitmap(icon)
         self._curr_file = None
         self.font_tuple = ['Consolas',12]
         self.geometry(geometry)
         self.co_ord = StringVar()
         self.wrap_var = IntVar(value=2)
-        self.font_rvar = IntVar(value=2)
+        self.font_rvar = IntVar(value=utils.find_in(fonts,self.font_tuple[0]))
         self.fsize_svar = StringVar(value=f"Current font size : {self.font_tuple[1]}")
         self.nchar_svar = StringVar()
+        self.search_window = None
 
-        # easter-egg -- Misc menu variables
+        # Secret feature / Misc menu variables
         self.misc_menu = None
-        self.ee = 0
+        self.sm_count = 0
 
         # creating Text widget and binding events to it
         self.main_frame = Frame(master=self,background=BACKGROUND)
@@ -45,9 +52,12 @@ class DarkPad(Tk):
         self.scrollbar = Scrollbar(master=self.main_frame,background=BACKGROUND,command=self.txtarea.yview)
         self.scrollbar.pack(side=RIGHT,fill=Y,anchor=E)
         self.txtarea.config(yscrollcommand=self.scrollbar.set)
+        self.txtarea.tag_configure("search",background=white,foreground='black')
+        self.txtarea.tag_configure("current_occurrence",background=highlight_clr,foreground='black')
         self.txtarea.bind("<Control-s>",func=lambda e:self.save_file(show_info=False))
         self.txtarea.bind("<Control-MouseWheel>",func=lambda e: self.incr_decr_fsize(e.delta))
-        self.txtarea.bind("<Control-u>",func=lambda e:self.easter_egg())
+        self.txtarea.bind("<Control-u>",func=lambda e:self.secret_menu())
+        self.txtarea.bind("<Control-f>",func=lambda e:self.open_search_window())
 
         # Menus
         self.main_menu = Menu(self,background=SECONDARY_BG,fg=white)
@@ -74,6 +84,12 @@ class DarkPad(Tk):
         self.wrap_menu.add_radiobutton(label="Wrap by characters",variable=self.wrap_var,value=1,command=self.config_wrap,selectcolor=white)
         self.wrap_menu.add_radiobutton(label="No wrap",variable=self.wrap_var,value=2,command=self.config_wrap,selectcolor=white)
         self.main_menu.add_cascade(label="Wrap",menu=self.wrap_menu)
+
+        # Tools menu 
+        self.tools_menu = Menu(self.main_menu,background=SECONDARY_BG,fg=white,tearoff=0)
+        self.tools_menu.add_command(label="Find & Replace",command=self.open_search_window)
+        self.tools_menu.add_command(label="Add today's date at cursor",command=self.add_date)
+        self.main_menu.add_cascade(label="Tools",menu=self.tools_menu)
         self.config(menu=self.main_menu)
 
         # footer
@@ -90,8 +106,6 @@ class DarkPad(Tk):
         self.nchar_label.pack(side=LEFT,anchor=W)
         
         # app initialization and configuration / event binding
-        self.txtarea.focus()
-        self.txtarea.mark_set(INSERT,"1.0")
         self.update_footer()
         self.bind("<Button>",lambda e:self.check_change())
         self.bind("<KeyPress>",lambda e:self.check_change())
@@ -100,27 +114,194 @@ class DarkPad(Tk):
             self.open_file(sys.argv[-1])
         self.update_footer()
 
-    def easter_egg(self):
+    def open_search_window(self):
         """
-        Easter egg feature : creates a new menu where encryption and decryption can be done
+        Opens a TopLevel window to use the search/find feature.
+        this can be triggered by either using <Control-f> or from Tools menu.
+        """
+        def find_all(search_entry:Entry,rindex:IntVar,rlist_var:StringVar,total:StringVar,index_reset_flag=True):
+            """
+            Finds all the occurences of searched word and highlights it using tag "search" and highlights the current occurrence (where cursor is present) with another tag "current_occurrence"
+            uses regular expression search and stores the Text.index() values in a list.
+            """
+            rlist = []
+            # if called from replace commands, `index_reset_flag` will be `False`, to keep the cursor on next occurrence of searched word
+            if index_reset_flag:
+                rindex.set(0)
+            # removing all tags before starting a fresh search
+            for tag in self.txtarea.tag_names():
+                self.txtarea.tag_remove(tag,'1.0','end')
+            start = self.txtarea.index('1.0')
+            search_word = search_entry.get()
+            if search_word:
+                matches = re.finditer(search_word, self.content)
+                for match in matches:
+                    # after finding matches, converting the str indicies to Text indicies and storing in a list
+                    match_start = self.txtarea.index(f"{start}+{match.start()}c")
+                    match_end = self.txtarea.index(f"{start}+{match.end()}c")
+                    rlist.append([match_start, match_end])
+                res_list.set(json.dumps(rlist))
+                if rlist:
+                    for tup in rlist:
+                        # adding "search" tags at indicies where search value is found
+                        self.txtarea.tag_add("search",tup[0],tup[1])
+                    
+                    while rindex.get()>len(rlist)-1:
+                        # handling index value when called from replace commands
+                        rindex.set(rindex.get()-1)
+                    # placing cursor at current occurrence and adding "current_occurrence" tag 
+                    self.txtarea.mark_set(INSERT,rlist[rindex.get()][0])
+                    self.txtarea.tag_add("current_occurrence",rlist[rindex.get()][0],rlist[rindex.get()][1])
+                    self.txtarea.see(INSERT)
+                    rlist_var.set(json.dumps(rlist))
+                    total.set(f"{rindex.get()+1}/{len(json.loads(rlist_var.get()))}")
+                    self.check_change()
+                else:
+                    total.set("0/0")
+            else:
+                total.set("0/0")
+
+        def next_occurrence(rindex:IntVar,rlist:StringVar,total:StringVar):
+            """
+            Moves the cursor and focus to next occurrence of searched text
+            while doing so, removes "current_occurrence" tag and puts it on next occurence
+            """
+            rlist = json.loads(rlist.get())
+            if len(rlist)!=0 and rindex.get()+1<len(rlist):
+                self.txtarea.tag_remove("current_occurrence",'1.0','end')
+                rindex.set(rindex.get()+1)
+                curr_tup = rlist[rindex.get()]
+                self.txtarea.mark_set(INSERT,curr_tup[0])
+                self.txtarea.tag_add("current_occurrence",curr_tup[0],curr_tup[1])
+                self.txtarea.see(INSERT)
+                total.set(f"{rindex.get()+1}/{len(rlist)}")
+                self.update_footer()
+
+        def prev_occurrence(rindex:IntVar,rlist:StringVar,total:StringVar):
+            """
+            Moves the cursor and focus to previous occurrence of searched text
+            while doing so, removes "current_occurrence" tag and puts it on previous occurence
+            """
+            rlist = json.loads(rlist.get())
+            if len(rlist)!=0 and rindex.get()-1>=0:
+                self.txtarea.tag_remove("current_occurrence",'1.0','end')
+                rindex.set(rindex.get()-1) 
+                curr_tup = rlist[rindex.get()]
+                self.txtarea.mark_set(INSERT,curr_tup[0])
+                self.txtarea.tag_add("current_occurrence",curr_tup[0],curr_tup[1])
+                self.txtarea.see(INSERT)
+                total.set(f"{rindex.get()+1}/{len(rlist)}")
+                self.update_footer()
+
+        def replace_current(r_entry:Entry,rindex:IntVar,rlist_var:StringVar,f_entry:Entry,total:StringVar):
+            """
+            replaces the found text with 'replace' text and updates the List which contains Text.index() values
+            """
+            ftext = f_entry.get()
+            rtext = r_entry.get()
+            if ftext==rtext:
+                return
+
+            rlist = json.loads(rlist_var.get())
+            if rlist:
+                curr_tup = rlist[rindex.get()]
+                self.txtarea.delete(curr_tup[0],curr_tup[1])
+                self.txtarea.insert(curr_tup[0],rtext)
+                find_all(f_entry,rindex,rlist_var,total,False)
+
+        def replace_all(r_entry:Entry,rindex:IntVar,rlist_var:StringVar,f_entry:Entry,total:StringVar):
+            """
+            replaces all occurrences of searched text with 'replace' text using python's str.replace() method and updates the list which contains Text.index() values
+            """
+            ftext = f_entry.get()
+            rtext = r_entry.get()
+            if ftext==rtext:
+                return
+
+            if json.loads(rlist_var.get()):
+                self.content = self.content.replace(ftext,rtext)
+                find_all(f_entry,rindex,rlist_var,total,False)
+                self.check_change()
+
+        if not isinstance(self.search_window,Toplevel):
+            def fr_destroy():
+                """
+                protocol for window destruction of 'find & replace' window
+                removes all kinds of tags from self.txtarea after destroying the TopLevel window.
+                """
+                self.search_window.destroy()
+                self.search_window = None
+                for tag in self.txtarea.tag_names():
+                    self.txtarea.tag_remove(tag,'1.0','end')
+
+            res_list = StringVar(value="[]")
+            total_var = StringVar(value="-/-")
+            res_index = IntVar(value=0)
+
+            # search window initialization and configuration
+            self.search_window = Toplevel(master=self,background=BACKGROUND)
+            self.search_window.geometry("350x150")
+            self.search_window.title(f"Find & Replace - {self.app_name}")
+            self.search_window.resizable(width=False,height=False)
+            self.search_window.protocol("WM_DELETE_WINDOW",func=fr_destroy)
+            self.search_window.focus_set()
+
+            # Creating and adding widgets to search window
+            upperFrame = Frame(master=self.search_window,background=BACKGROUND)
+            upperFrame.pack(side=TOP,padx=30,anchor=W)
+            f_label = Label(master=upperFrame,background=BACKGROUND,foreground=white,text="Find :")
+            f_entry = Entry(master=upperFrame,background=BACKGROUND,foreground=white,insertbackground=white,width=25)
+            r_label = Label(master=upperFrame,background=BACKGROUND,foreground=white,text="Replace :")
+            r_entry = Entry(master=upperFrame,background=BACKGROUND,foreground=white,insertbackground=white,width=25)
+            find_btn = Button(master=upperFrame,background=SECONDARY_BG,foreground=white,text="Find all",width=8,command=lambda:find_all(f_entry,res_index,res_list,total_var))
+            f_label.grid(row=0,column=0,padx=3,pady=3)
+            f_entry.grid(row=0,column=1,padx=3,pady=3)
+            r_label.grid(row=1,column=0,padx=3,pady=3)
+            r_entry.grid(row=1,column=1,padx=3,pady=3)
+            find_btn.grid(row=0,column=2,padx=3,pady=3)
+            f_entry.focus()
+
+            midFrame = Frame(master=self.search_window,background=BACKGROUND)
+            midFrame.pack(side=TOP,padx=30,anchor=W)
+            res_lbl = Label(master=midFrame,background=BACKGROUND,foreground=white,textvariable=total_var)
+            res_lbl.pack(padx=100)
+
+            lowerFrame = Frame(master=self.search_window,background=BACKGROUND)
+            lowerFrame.pack(side=TOP,padx=30,anchor=W)
+            prev_btn = Button(master=lowerFrame,background=SECONDARY_BG,foreground=white,text="Previous",width=15,command=lambda:prev_occurrence(res_index,res_list,total_var))
+            next_btn = Button(master=lowerFrame,background=SECONDARY_BG,foreground=white,text="Next",width=15,command=lambda:next_occurrence(res_index,res_list,total_var))
+            replace_btn = Button(master=lowerFrame,background=SECONDARY_BG,foreground=white,text="Replace current",width=15,command=lambda:replace_current(r_entry,res_index,res_list,f_entry,total_var))
+            replace_all_btn = Button(master=lowerFrame,background=SECONDARY_BG,foreground=white,text="Replace all",width=15,command=lambda:replace_all(r_entry,res_index,res_list,f_entry,total_var))
+            prev_btn.grid(row=0,column=0,padx=3,pady=3)
+            next_btn.grid(row=0,column=1,padx=3,pady=3)
+            replace_btn.grid(row=1,column=0,padx=5,pady=3)
+            replace_all_btn.grid(row=1,column=1,padx=5,pady=3)
+        else:
+            # window is already opened and out of focus. bringing up the window and setting focus on window
+            self.search_window.lift()
+            self.search_window.focus_set()
+
+    def secret_menu(self):
+        """
+        Secret feature : creates a new menu where encryption and decryption can be done
         this feature can be triggered by pressing ctrl+u 99 times, anytime when Misc menu is invisible
         """
-        self.ee += 1
-        if self.ee == 99:
+        self.sm_count += 1
+        if self.sm_count == 99:
             self.misc_menu = Menu(self.main_menu,background=SECONDARY_BG,fg=white,tearoff=0)
-            self.misc_menu.add_command(label="Encrypt",command=self.ee_enc)
-            self.misc_menu.add_command(label="Decrypt",command=self.ee_dec)
+            self.misc_menu.add_command(label="Encrypt",command=self.sm_enc)
+            self.misc_menu.add_command(label="Decrypt",command=self.sm_dec)
             self.misc_menu.add_separator()
-            self.misc_menu.add_command(label="Text to binary",command=self.ee_t2b)
-            self.misc_menu.add_command(label="Binary to text",command=self.ee_b2t)
+            self.misc_menu.add_command(label="Text to binary",command=self.sm_t2b)
+            self.misc_menu.add_command(label="Binary to text",command=self.sm_b2t)
             self.misc_menu.add_separator()
-            self.misc_menu.add_command(label="Destroy!!",command=self.ee_destroy)
+            self.misc_menu.add_command(label="Destroy!!",command=self.sm_destroy)
             self.main_menu.add_cascade(label="Misc",menu=self.misc_menu)
             self.config(menu=self.main_menu)
 
-    def ee_enc(self):
+    def sm_enc(self):
         """
-        Easter egg feature
+        secret menu feature
         Encrypts the existing text using key given by user
         best to not use when text is too long
         """
@@ -131,9 +312,9 @@ class DarkPad(Tk):
             self.content = text
             self.check_change()
     
-    def ee_dec(self):
+    def sm_dec(self):
         """
-        Easter egg feature
+        secret menu feature
         Decrypts the existing text using key given by user
         """
         key = askstring(title="Key",prompt="Enter decryption key:\t\t\t")
@@ -143,17 +324,17 @@ class DarkPad(Tk):
             self.content = text
             self.check_change()
 
-    def ee_t2b(self):
+    def sm_t2b(self):
         """
-        Easter egg feature
+        secret menu feature
         Converts the given text to binary 
         """
         self.content = binary_utils.text_to_binary(self.content)
         self.check_change()
 
-    def ee_b2t(self):
+    def sm_b2t(self):
         """
-        Easter egg feature
+        secret menu feature
         Converts binary to normal text
         """
         try:
@@ -162,13 +343,19 @@ class DarkPad(Tk):
         except TypeError:
             return msgbox.showerror(title="Error",message="Given text is not binary")
 
-    def ee_destroy(self):
+    def sm_destroy(self):
         """
-        destroys the Misc menu and resets the easter egg trigger counter to 0 (self.ee = 0)
+        destroys the Misc menu and resets the secret menu trigger counter to 0 (self.ee = 0)
         """
         self.misc_menu.destroy()
-        self.main_menu.delete(4,4)
-        self.ee = 0
+        self.main_menu.delete(5,5)
+        self.sm_count = 0
+
+    def add_date(self):
+        """
+        Adds a Date time string at current position of cursor
+        """
+        self.txtarea.insert(self.txtarea.index(INSERT),str(datetime.now()).split('.')[0])
 
     def destroy_event(self):
         """
@@ -303,7 +490,6 @@ class DarkPad(Tk):
         self.txtarea.delete(1.0,END)
         self.nchar_svar.set(f"Number of characters : {len(self.content)}")
 
-
     def open_file(self,filename=""):
         """
         Opens a file and writes its content into text widget
@@ -326,6 +512,9 @@ class DarkPad(Tk):
                 self.content = f.read()
                 self.curr_file = filename
         self.nchar_svar.set(f"Number of characters : {len(self.content)}")
+        self.txtarea.mark_set(INSERT,'1.0')
+        self.txtarea.focus()
+        self.txtarea.see(INSERT)
 
     def save_file(self,show_info=True):
         """
@@ -355,7 +544,6 @@ class DarkPad(Tk):
             with open(self.curr_file,'w') as f:
                 f.write(self.content)
             msgbox.showinfo(title="Success",message=f"Successfully saved file at {self.curr_file}")
-
 
     @property
     def fs_changed(self):
