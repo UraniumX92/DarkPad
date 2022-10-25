@@ -291,7 +291,7 @@ class DarkPad(Tk):
         Ctrl + BackSpace functionality which deletes the whole word before "insert" mark
         """
         self.txtarea.delete("insert-1c wordstart",INSERT)
-        self.update_footer()
+        self.check_change()
         return "break" # returning "break" to stop natural behaviour
 
     def ctrl_delete(self):
@@ -299,7 +299,7 @@ class DarkPad(Tk):
         Ctrl + Delete functionality which deletes the whole word after "insert" mark
         """
         self.txtarea.delete(INSERT,"insert+1c wordend")
-        self.update_footer()
+        self.check_change()
         return "break"
 
     def secret_menu(self):
