@@ -59,6 +59,8 @@ class DarkPad(Tk):
         self.txtarea.bind("<Control-MouseWheel>",func=lambda e: self.incr_decr_fsize(e.delta))
         self.txtarea.bind("<Control-u>",func=lambda e:self.secret_menu())
         self.txtarea.bind("<Control-f>",func=lambda e:self.open_search_window())
+        self.txtarea.bind("<Control-BackSpace>",func=lambda e:self.ctrl_backspace())
+        self.txtarea.bind("<Control-Delete>",func=lambda e:self.ctrl_delete())
 
         # Menus
         self.main_menu = Menu(self,background=SECONDARY_BG,fg=white)
@@ -114,6 +116,7 @@ class DarkPad(Tk):
         if len(sys.argv)>1:
             self.open_file(sys.argv[-1])
         self.update_footer()
+        self.txtarea.focus()
 
     def open_search_window(self):
         """
@@ -282,6 +285,22 @@ class DarkPad(Tk):
             # window is already opened and out of focus. bringing up the window and setting focus on window
             self.search_window.lift()
             self.search_window.focus_set()
+
+    def ctrl_backspace(self):
+        """
+        Ctrl + BackSpace functionality which deletes the whole word before "insert" mark
+        """
+        self.txtarea.delete("insert-1c wordstart",INSERT)
+        self.update_footer()
+        return "break" # returning "break" to stop natural behaviour
+
+    def ctrl_delete(self):
+        """
+        Ctrl + Delete functionality which deletes the whole word after "insert" mark
+        """
+        self.txtarea.delete(INSERT,"insert+1c wordend")
+        self.update_footer()
+        return "break"
 
     def secret_menu(self):
         """
