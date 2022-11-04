@@ -55,8 +55,9 @@ class DarkPad(Tk):
         self.txtarea.config(yscrollcommand=self.scrollbar.set)
         self.txtarea.tag_configure("search",background=white,foreground='black')
         self.txtarea.tag_configure("current_occurrence",background=highlight_clr,foreground='black')
+        self.txtarea.bind("<Tab>",lambda e:self.insert_tab())
         self.txtarea.bind("<Control-s>",func=lambda e:self.save_file(show_info=False))
-        self.txtarea.bind("<Control-MouseWheel>",func=lambda e: self.incr_decr_fsize(e.delta))
+        self.txtarea.bind("<Control-MouseWheel>",func=lambda e: self.scroll_fsize(e.delta))
         self.txtarea.bind("<Control-u>",func=lambda e:self.secret_menu())
         self.txtarea.bind("<Control-f>",func=lambda e:self.open_search_window())
         self.txtarea.bind("<Control-BackSpace>",func=lambda e:self.ctrl_backspace())
@@ -91,7 +92,7 @@ class DarkPad(Tk):
         # Tools menu 
         self.tools_menu = Menu(self.main_menu,background=SECONDARY_BG,fg=white,tearoff=0)
         self.tools_menu.add_command(label="Find & Replace",command=self.open_search_window)
-        self.tools_menu.add_command(label="Add today's date at cursor",command=self.add_date)
+        self.tools_menu.add_command(label="Add today's date/time at cursor",command=self.add_date)
         self.main_menu.add_cascade(label="Tools",menu=self.tools_menu)
         self.config(menu=self.main_menu)
 
@@ -244,11 +245,25 @@ class DarkPad(Tk):
 
             # search window initialization and configuration
             self.search_window = Toplevel(master=self,background=BACKGROUND)
+
+            def focus_out(event:Event):
+                """
+                Callback function for when focus is out of Search window
+                """
+                focus = str(self.search_window.focus_get()) # typecasting widget to string gives the path of widget
+                if not focus.startswith(str(self.search_window)):
+                    res_list.set("[]")
+                    total_var.set("-/-")
+                    res_index.set(0)
+                    for tag in self.txtarea.tag_names():
+                        self.txtarea.tag_remove(tag,'1.0','end')
+
             self.search_window.geometry("350x150")
             self.search_window.iconbitmap(self.icon_path)
             self.search_window.title(f"Find & Replace - {self.app_name}")
             self.search_window.resizable(width=False,height=False)
             self.search_window.protocol("WM_DELETE_WINDOW",func=fr_destroy)
+            self.search_window.bind("<FocusOut>",focus_out)
             self.search_window.focus_set()
 
             # Creating and adding widgets to search window
@@ -372,17 +387,26 @@ class DarkPad(Tk):
         self.main_menu.delete(5,5)
         self.sm_count = 0
 
+    def insert_tab(self):
+        """
+        Inserts a tab and checks the for change, this is implemented because default <Tab> event binding wasn't working as required.
+        """
+        self.txtarea.insert(self.txtarea.index(INSERT),"\t")
+        self.check_change()
+        return "break"
+
     def add_date(self):
         """
         Adds a Date time string at current position of cursor
         """
-        self.txtarea.insert(self.txtarea.index(INSERT),str(datetime.now()).split('.')[0])
+        self.txtarea.insert(self.txtarea.index(INSERT),datetime.now().strftime(r"%d/%m/%Y %H:%M:%S"))
+        self.check_change()
 
     def destroy_event(self):
         """
         when user is trying to close the application, then this method will run and ask for confirmation
         """
-        if self.fs_changed:
+        def warning_protocol():
             resp = msgbox.askyesnocancel(title="Warning",message="You have unsaved work, do you want to save before exit?")
             if resp is None:
                 return
@@ -391,9 +415,14 @@ class DarkPad(Tk):
                 self.destroy()
             else:
                 self.destroy()
-        else:
-            self.destroy()
-    
+        try:
+            if self.fs_changed:
+                warning_protocol()
+            else:
+                self.destroy()
+        except FileNotFoundError:
+            warning_protocol()
+
     def config_wrap(self):
         """
         wrap configuration, this method is used as command in self.wrap_menu
@@ -432,13 +461,16 @@ class DarkPad(Tk):
         this method is used as <KeyPress> event handler for application (self)
         """
         self.update_footer()
-        if self.fs_changed:
-            if self._curr_file:
-                self.title(f"* {self.curr_file} - {self.app_name}")
+        try:
+            if self.fs_changed:
+                if self._curr_file:
+                    self.title(f"* {self.curr_file} - {self.app_name}")
+                else:
+                    self.title(f"* Untitled - {self.app_name}")
             else:
-                self.title(f"* Untitled - {self.app_name}")
-        else:
-            self.title(f"{self.curr_file} - {self.app_name}")
+                self.title(f"{self.curr_file} - {self.app_name}")
+        except FileNotFoundError:
+            self.title(f"* Untitled - {self.app_name}")
 
     def update_footer(self):
         """
@@ -457,7 +489,7 @@ class DarkPad(Tk):
         else:
             self.title(f"Untitled - {self.app_name}")
 
-    def incr_decr_fsize(self,delta):
+    def scroll_fsize(self,delta):
         """
         increases and decreases the font size in even numbers (with step of 2), 
         this method is used as <Control-MouseWheel> event handler for text widget
@@ -475,6 +507,9 @@ class DarkPad(Tk):
 
     @property
     def curr_file(self):
+        """
+        gives the name of the current file, None if no file is selected
+        """
         return self._curr_file
 
     @curr_file.setter
@@ -491,21 +526,30 @@ class DarkPad(Tk):
 
     @property
     def app_name(self):
+        """
+        Returns the __app_name value ("DarkPad")
+        """
         return self.__app_name
     
     @app_name.setter
     def app_name(self,v):
+        """
+        This property cannot be modified
+        """
         return
 
     def create_file(self):
         """
         create a new empty file (unsaved state/Untitled)
         """
-        if self.fs_changed:
-            if msgbox.askyesno(title="Confirmation",message="Do you want to proceed without saving the currently opened file?"):
-                pass
-            else:
-                return
+        try:
+            if self.fs_changed:
+                if msgbox.askyesno(title="Confirmation",message="Do you want to proceed without saving the currently opened file?"):
+                    pass
+                else:
+                    return
+        except FileNotFoundError:
+            pass
 
         self.curr_file = None
         self.txtarea.delete(1.0,END)
@@ -516,13 +560,17 @@ class DarkPad(Tk):
         Opens a file and writes its content into text widget
         """
         if not filename: # filename not provided, user is asked to open file
-            if self.curr_file and self.fs_changed:
-                if msgbox.askyesno(title="Confirmation",message="Do you want to proceed without saving the currently opened file?"):
-                    pass
+            try:
+                if self.curr_file and self.fs_changed:
+                    if msgbox.askyesno(title="Confirmation",message="Do you want to proceed without saving the currently opened file?"):
+                        pass
+                    else:
+                        return
                 else:
-                    return
-            else:
+                    pass
+            except FileNotFoundError:
                 pass
+
             file = fd.askopenfilename(title="Open a file")
             if file:
                 self.curr_file = file
@@ -541,17 +589,20 @@ class DarkPad(Tk):
         """
         Saves the content of file in file located at self.curr_file 
         """
-        if self.fs_changed :
-            if not self.curr_file:
-                file = fd.asksaveasfilename(title="Save this file")
-                if file:
-                    self.curr_file = file
-                else:
-                    return
-            with open(self.curr_file,'w') as f:
-                f.write(self.content)
-            if show_info:
-                msgbox.showinfo(title="Success",message=f"Successfully saved file at {self.curr_file}")
+        try:
+            if self.fs_changed :
+                if not self.curr_file:
+                    file = fd.asksaveasfilename(title="Save this file")
+                    if file:
+                        self.curr_file = file
+                    else:
+                        return
+                with open(self.curr_file,'w') as f:
+                    f.write(self.content)
+                if show_info:
+                    msgbox.showinfo(title="Success",message=f"Successfully saved file at {self.curr_file}")
+        except FileNotFoundError:
+            self.save_file_as()
     
     def save_file_as(self):
         """
@@ -572,16 +623,23 @@ class DarkPad(Tk):
         checks if the current state of text widget is changed from saved file at self.curr_file
         if self.curr_file is None, returns True
         """
-        if self.curr_file:
-            f_content = ""
-            with open(self.curr_file,'r') as f:
-                f_content = f.read()
-            return not f_content == self.content
-        else:
-            return True
+        try:
+            if self.curr_file:
+                f_content = ""
+                with open(self.curr_file,'r') as f:
+                    f_content = f.read()
+                return not f_content == self.content
+            else:
+                return True
+        except FileNotFoundError as err:
+            self.curr_file = None
+            raise err
     
     @fs_changed.setter
     def fs_changed(self,v):
+        """
+        This property cannot be modified
+        """
         return
 
     @property
