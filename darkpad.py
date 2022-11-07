@@ -15,6 +15,7 @@ BACKGROUND = '#191919'
 SECONDARY_BG = '#2d2d2d'
 white = 'white'
 highlight_clr = '#e9ff40'
+bullet_char = "\u2022"
 min_fsize = 2
 max_fsize = 100
 fonts = ["Arial","Courier","Consolas","Times","Segoe UI"]
@@ -461,20 +462,20 @@ class DarkPad(Tk):
         
     def check_change(self):
         """
-        this method checks if there are any changes in text widget from the saved file, if there is change then '*' will be prefixed to the window title
+        this method checks if there are any changes in text widget from the saved file, if there is change then '•' will be prefixed and suffixed to the window title
         this method is used as <KeyPress> event handler for application (self)
         """
         self.update_footer()
         try:
             if self.fs_changed:
                 if self._curr_file:
-                    self.title(f"* {self.curr_file} - {self.app_name}")
+                    self.title(f"{bullet_char} {self.curr_file} - {self.app_name} {bullet_char}")
                 else:
-                    self.title(f"* Untitled - {self.app_name}")
+                    self.title(f"{bullet_char} Untitled - {self.app_name} {bullet_char}")
             else:
                 self.title(f"{self.curr_file} - {self.app_name}")
         except FileNotFoundError:
-            self.title(f"* Untitled - {self.app_name}")
+            self.title(f"{bullet_char} Untitled - {self.app_name} {bullet_char}")
 
     def update_footer(self):
         """
