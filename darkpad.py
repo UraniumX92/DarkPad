@@ -115,13 +115,13 @@ class DarkPad(Tk):
         self.nchar_label.pack(side=LEFT,anchor=W)
         
         # app initialization and configuration / event binding
-        self.update_footer()
         self.bind("<Button>",lambda e:self.check_change())
         self.bind("<KeyPress>",lambda e:self.check_change())
         self.protocol("WM_DELETE_WINDOW",self.destroy_event)
         if len(sys.argv)>1:
             self.open_file(sys.argv[-1])
         self.check_change()
+        self.config_wrap()
         self.update_footer()
         self.txtarea.focus()
 
