@@ -36,7 +36,7 @@ class DarkPad(Tk):
         self.font_tuple = ['Consolas',12]
         self.geometry(geometry)
         self.co_ord = StringVar()
-        self.wrap_var = IntVar(value=2)
+        self.wrap_var = IntVar()
         self.font_rvar = IntVar(value=utils.find_in(fonts,self.font_tuple[0]))
         self.fsize_svar = StringVar(value=f"Current font size : {self.font_tuple[1]}")
         self.nchar_svar = StringVar()
@@ -121,6 +121,7 @@ class DarkPad(Tk):
         self.protocol("WM_DELETE_WINDOW",self.destroy_event)
         if len(sys.argv)>1:
             self.open_file(sys.argv[-1])
+        self.check_change()
         self.update_footer()
         self.txtarea.focus()
 
@@ -351,6 +352,8 @@ class DarkPad(Tk):
             key = utils.get_key(key)
             text = utils.ciph(self.content,key)
             self.content = text
+            self.wrap_var.set(0)
+            self.config_wrap()
             self.check_change()
     
     def sm_dec(self):
@@ -422,7 +425,10 @@ class DarkPad(Tk):
                 self.destroy()
         try:
             if self.fs_changed:
-                warning_protocol()
+                if self.content:
+                    warning_protocol()
+                else:
+                    self.destroy()
             else:
                 self.destroy()
         except FileNotFoundError:
