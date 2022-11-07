@@ -56,9 +56,13 @@ class DarkPad(Tk):
         self.txtarea.tag_configure("search",background=white,foreground='black')
         self.txtarea.tag_configure("current_occurrence",background=highlight_clr,foreground='black')
         self.txtarea.bind("<Tab>",lambda e:self.insert_tab())
+        # Have to make two events for lower and upper case letters separately
         self.txtarea.bind("<Control-f>",func=lambda e:self.open_search_window())
+        self.txtarea.bind("<Control-F>",func=lambda e:self.open_search_window())
         self.txtarea.bind("<Control-s>",func=lambda e:self.save_file(show_info=False))
+        self.txtarea.bind("<Control-S>",func=lambda e:self.save_file(show_info=False))
         self.txtarea.bind("<Control-u>",func=lambda e:self.secret_menu())
+        self.txtarea.bind("<Control-U>",func=lambda e:self.secret_menu())
         self.txtarea.bind("<Control-Delete>",func=lambda e:self.ctrl_delete())
         self.txtarea.bind("<Control-BackSpace>",func=lambda e:self.ctrl_backspace())
         self.txtarea.bind("<Control-MouseWheel>",func=lambda e: self.scroll_fsize(e.delta))
@@ -587,8 +591,8 @@ class DarkPad(Tk):
                     self.curr_file = filename
                 except UnicodeDecodeError:
                     return msgbox.showerror(title="Error",message="Selected file is not a text file")
-              
-        self.nchar_svar.set(f"Number of characters : {len(self.content)}")
+
+        self.update_footer()
         self.txtarea.mark_set(INSERT,'1.0')
         self.txtarea.focus()
         self.txtarea.see(INSERT)
@@ -609,6 +613,7 @@ class DarkPad(Tk):
                     f.write(self.content)
                 if show_info:
                     msgbox.showinfo(title="Success",message=f"Successfully saved file at {self.curr_file}")
+                self.check_change()
         except FileNotFoundError:
             self.save_file_as()
     
