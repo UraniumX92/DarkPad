@@ -29,7 +29,7 @@ class DarkPad(Tk):
         Tk.__init__(self)
         # Initialization
         self.__app_name = "DarkPad"
-        self.char_encoding = "UTF-16"
+        self.char_encoding = "UTF-8"
         self.title(f"Untitled - {self.app_name}")
         self.icon_path = icon
         self.iconbitmap(self.icon_path)
