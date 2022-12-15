@@ -29,6 +29,7 @@ class DarkPad(Tk):
         Tk.__init__(self)
         # Initialization
         self.__app_name = "DarkPad"
+        self.char_encoding = "UTF-16"
         self.title(f"Untitled - {self.app_name}")
         self.icon_path = icon
         self.iconbitmap(self.icon_path)
@@ -469,7 +470,7 @@ class DarkPad(Tk):
     def check_change(self):
         """
         this method checks if there are any changes in text widget from the saved file, if there is change then '•' will be prefixed and suffixed to the window title
-        this method is used as <KeyPress> event handler for application (self)
+        this method is used as <KeyPress> event handler for application (self) and is used in some other events, methods too.
         """
         self.update_footer()
         try:
@@ -584,7 +585,7 @@ class DarkPad(Tk):
 
             file = fd.askopenfilename(title="Open a file")
             if file:
-                with open(file,'r') as f:
+                with open(file,'r',encoding=self.char_encoding) as f:
                     try:
                         self.content = f.read()
                         self.curr_file = file
@@ -592,7 +593,7 @@ class DarkPad(Tk):
                         return msgbox.showerror(title="Error",message="Selected file is not a text file")
 
         else: # filename provided, opening file directly
-            with open(filename,'r') as f:
+            with open(filename,'r',encoding=self.char_encoding) as f:
                 try:
                     self.content = f.read()
                     self.curr_file = filename
@@ -616,7 +617,7 @@ class DarkPad(Tk):
                         self.curr_file = file
                     else:
                         return
-                with open(self.curr_file,'w') as f:
+                with open(self.curr_file,'w',encoding=self.char_encoding) as f:
                     f.write(self.content)
                 if show_info:
                     msgbox.showinfo(title="Success",message=f"Successfully saved file at {self.curr_file}")
@@ -633,7 +634,7 @@ class DarkPad(Tk):
         file = fd.asksaveasfilename(title="Save this file as..")
         if file:
             self.curr_file = file
-            with open(self.curr_file,'w') as f:
+            with open(self.curr_file,'w',encoding=self.char_encoding) as f:
                 f.write(self.content)
             msgbox.showinfo(title="Success",message=f"Successfully saved file at {self.curr_file}")
 
@@ -646,7 +647,7 @@ class DarkPad(Tk):
         try:
             if self.curr_file:
                 f_content = ""
-                with open(self.curr_file,'r') as f:
+                with open(self.curr_file,'r',encoding=self.char_encoding) as f:
                     f_content = f.read()
                 return not f_content == self.content
             else:
